@@ -1,0 +1,3 @@
+[submodule "External-EnyimMemcached"]
+	path = External-EnyimMemcached
+	url = https://github.com/rrmayer/EnyimMemcached.git
