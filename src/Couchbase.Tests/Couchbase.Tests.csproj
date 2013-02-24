@@ -109,11 +109,11 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\lib\EnyimMemcached\Enyim.Caching.Log4NetAdapter\Enyim.Caching.Log4NetAdapter.csproj">
+    <ProjectReference Include="..\..\External-EnyimMemcached\Enyim.Caching.Log4NetAdapter\Enyim.Caching.Log4NetAdapter.csproj">
       <Project>{9D3F12E6-6BDD-4DED-8B25-D877780640B4}</Project>
       <Name>Enyim.Caching.Log4NetAdapter</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\lib\EnyimMemcached\Enyim.Caching\Enyim.Caching.csproj">
+    <ProjectReference Include="..\..\External-EnyimMemcached\Enyim.Caching\Enyim.Caching.csproj">
       <Project>{D438C0B3-A168-40B8-BDDD-61F0939DFF35}</Project>
       <Name>Enyim.Caching</Name>
     </ProjectReference>
