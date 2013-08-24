@@ -3,6 +3,7 @@ using System.Net;
 using Enyim.Caching.Memcached;
 using Enyim.Caching.Memcached.Protocol.Binary;
 using Enyim.Caching.Memcached.Results.StatusCodes;
+using Newtonsoft.Json;
 using Couchbase.Configuration;
 using Couchbase.Results;
 using Enyim.Caching.Memcached.Results.Extensions;

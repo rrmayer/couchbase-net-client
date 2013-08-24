@@ -8,6 +8,8 @@ using Enyim.Caching.Memcached.Results;
 using Enyim.Caching.Memcached;
 using Couchbase.Configuration;
 using Couchbase.Tests.Factories;
+using Couchbase.Management;
+using System.IO;
 
 namespace Couchbase.Tests
 {
@@ -23,7 +25,13 @@ namespace Couchbase.Tests
 		{
 			_Client = CouchbaseClientFactory.CreateCouchbaseClient();
 
-			log4net.Config.XmlConfigurator.Configure();
+			//TODO: uncomment this line when next NuGet (1.2.7) is pushed
+			//log4net.Config.XmlConfigurator.Configure();
+
+			var cluster = new CouchbaseCluster("couchbase");
+
+			var stream = File.Open(@"Data\\ThingViews.json", FileMode.Open);
+			cluster.CreateDesignDocument("default", "things", stream);
 		}
 
 		protected string GetUniqueKey(string prefix = null)

@@ -8,6 +8,11 @@ namespace Couchbase
 	{
 		object Get(string key, DateTime newExpiration);
 		T Get<T>(string key, DateTime newExpiration);
+		CasResult<object> GetWithLock(string key);
+		CasResult<T> GetWithLock<T>(string key);
+		CasResult<object> GetWithLock(string key, TimeSpan lockExpiration);
+		CasResult<T> GetWithLock<T>(string key, TimeSpan lockExpiration);
+		bool Unlock(string key, ulong cas);
 		CasResult<object> GetWithCas(string key, DateTime newExpiration);
 		CasResult<T> GetWithCas<T>(string key, DateTime newExpiration);
 		IDictionary<string, SyncResult> Sync(SyncMode mode, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, ulong>> items);
@@ -22,6 +27,8 @@ namespace Couchbase
 		IDictionary<string, object> Get(IView view);
 		ISpatialView<ISpatialViewRow> GetSpatialView(string designName, string viewName);
 		ISpatialView<T> GetSpatialView<T>(string designName, string viewName, bool shouldLookupDocById = false);
+		bool KeyExists(string key);
+		bool KeyExists(string key, ulong cas);
 	}
 }
 

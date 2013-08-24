@@ -54,9 +54,15 @@ namespace Couchbase.Tests
 		[Test]
 		public void When_Storing_A_New_Key_Observe_Will_Succeed_With_Multi_Node_Persistence()
 		{
-			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
-			var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Two);
-			StoreAssertPass(storeResult);
+			var availableNodesCount = getWorkingNodes().Count();
+			if (availableNodesCount > 1)
+			{
+				var kv = KeyValueUtils.GenerateKeyAndValue("observe");
+				var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Two);
+				StoreAssertPass(storeResult);
+			}
+			else
+				Assert.Ignore("This test requires more than one node in the cluster");
 		}
 
 		/// <summary>
@@ -68,9 +74,15 @@ namespace Couchbase.Tests
 		[Test]
 		public void When_Storing_A_New_Key_Observe_Will_Succeed_With_Multi_Node_Persistence_And_Single_Node_Replication()
 		{
-			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
-			var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Two, ReplicateTo.One);
-			StoreAssertPass(storeResult);
+			var availableNodesCount = getWorkingNodes().Count();
+			if (availableNodesCount > 1)
+			{
+				var kv = KeyValueUtils.GenerateKeyAndValue("observe");
+				var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Two, ReplicateTo.One);
+				StoreAssertPass(storeResult);
+			}
+			else
+				Assert.Ignore("This test requires more than one node in the cluster");
 		}
 
 		/// <summary>
@@ -107,85 +119,91 @@ namespace Couchbase.Tests
 		[Test]
 		public void When_Storing_A_New_Key_Observe_Will_Succeed_With_Multi_Node_Replication()
 		{
-			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
-			var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, ReplicateTo.Two);
-			StoreAssertPass(storeResult);
+			var availableNodesCount = getWorkingNodes().Count();
+			if (availableNodesCount > 1)
+			{
+				var kv = KeyValueUtils.GenerateKeyAndValue("observe");
+				var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, ReplicateTo.Two);
+				StoreAssertPass(storeResult);
+			}
+			else
+				Assert.Ignore("This test requires more than one node in the cluster");
 		}
 
 		/// <summary>
-		/// @test: Generate a new key-value tuple, store the key value with replication set to one more
-		/// than the total number of available nodes in the cluster
-		/// @pre: Default configuration to initialize client in App.config, add NumberOfNodesInTheCluster in app settings
-		/// @post: Test passes if store operation returns false
+		/// @test: Generate a new key-value tuple, store the key value, observe replication to one more than the total number of nodes
+		/// @pre: Default configuration to initialize client in App.config, number of nodes in cluster for this case should be either one or two
+		/// Keep PersistTo as zero as this test will only verify the replication
+		/// @post: Test passes if the observe operation returns false
 		/// </summary>
 		[Test]
-		public void When_Storing_A_New_Key_Observe_Will_Pass_With_Replication_More_Than_Available_Nodes()
+		public void When_Storing_A_New_Key_Observe_Will_Fail_With_Replication_More_Than_Available_Nodes()
 		{
-			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
-			IStoreOperationResult storeResult = null;
-
 			var availableNodesCount = getWorkingNodes().Count();
+			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
+			var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2);
 
 			switch (availableNodesCount)
 			{
 				case 1:
 					{
-						storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, ReplicateTo.Two);
+						var observeResult = _Client.Observe(kv.Item2, storeResult.Cas, PersistTo.Zero, ReplicateTo.Two);
+						Assert.That(observeResult.Success, Is.False);
 						break;
 					}
 				case 2:
 					{
-						storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, ReplicateTo.Three);
+						var observeResult = _Client.Observe(kv.Item2, storeResult.Cas, PersistTo.Zero, ReplicateTo.Three);
+						Assert.That(observeResult.Success, Is.False);
 						break;
 					}
 				default:
 					{
-						storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, ReplicateTo.Three);
+						Assert.Fail("The test is applicable only when the number of nodes in cluster is either one or two.");
 						break;
 					}
 			}
-
-			StoreAssertPass(storeResult);
 		}
 
 		/// <summary>
-		/// @test: Generate a new key-value tuple, store the key value with persistence set to one more
-		/// than the total number of available nodes in the cluster
-		/// @pre: Default configuration to initialize client in App.config
-		/// @post: Test passes if store operation returns false
+		/// @test: Generate a new key-value tuple, store the key value, observe persistance to one more than the total number of nodes
+		/// @pre: Default configuration to initialize client in App.config, number of nodes in cluster for this case should be either one, two or three
+		/// Keep Replicate as zero as this test will only verify the persistence
+		/// @post: Test passes if the observe operation returns false
 		/// </summary>
 		[Test]
 		public void When_Storing_A_New_Key_Observe_Will_Fail_With_Persistence_More_Than_Available_Nodes()
 		{
-			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
-			IStoreOperationResult storeResult = null;
 			var availableNodesCount = getWorkingNodes().Count();
+			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
+			var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2);
 
 			switch (availableNodesCount)
 			{
 				case 1:
 					{
-						storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Two);
+						var observeResult = _Client.Observe(kv.Item2, storeResult.Cas, PersistTo.Two, ReplicateTo.Zero);
+						Assert.That(observeResult.Success, Is.False);
 						break;
 					}
 				case 2:
 					{
-						storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Three);
+						var observeResult = _Client.Observe(kv.Item2, storeResult.Cas, PersistTo.Three, ReplicateTo.Zero);
+						Assert.That(observeResult.Success, Is.False);
 						break;
 					}
 				case 3:
 					{
-						storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Four);
+						var observeResult = _Client.Observe(kv.Item2, storeResult.Cas, PersistTo.Four, ReplicateTo.Zero);
+						Assert.That(observeResult.Success, Is.False);
 						break;
 					}
 				default:
 					{
-						storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, PersistTo.Four);
+						Assert.Fail("The test is applicable only when the number of nodes in cluster is either one, two or three.");
 						break;
 					}
 			}
-
-			Assert.That(storeResult.Success, Is.False);
 		}
 
 		/// <summary>
@@ -197,9 +215,15 @@ namespace Couchbase.Tests
 		[Test]
 		public void When_Storing_A_New_Key_Observe_Will_Fail_When_Cluster_Has_Too_Few_Nodes_For_Replication()
 		{
-			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
-			var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, ReplicateTo.Three);
-			Assert.That(storeResult.Success, Is.False);
+			var availableNodesCount = getWorkingNodes().Count();
+			if (availableNodesCount > 1)
+			{
+				var kv = KeyValueUtils.GenerateKeyAndValue("observe");
+				var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2, ReplicateTo.Three);
+				Assert.That(storeResult.Success, Is.False);
+			}
+			else
+				Assert.Ignore("This test requires more than one node in the cluster");
 		}
 
 		/// <summary>
@@ -215,11 +239,11 @@ namespace Couchbase.Tests
 			var kv = KeyValueUtils.GenerateKeyAndValue("observe");
 			var storeResult = _Client.ExecuteStore(StoreMode.Set, kv.Item1, kv.Item2);
 
-			var observeResult1 = _Client.Observe(kv.Item2, storeResult.Cas - 1, PersistTo.One, ReplicateTo.Zero);
+			var observeResult1 = _Client.Observe(kv.Item1, storeResult.Cas - 1, PersistTo.One, ReplicateTo.Zero);
 			Assert.That(observeResult1.Success, Is.False);
 			Assert.That(observeResult1.Message, Is.StringMatching(ObserveOperationConstants.MESSAGE_MODIFIED));
 
-			var observeResult2 = _Client.Observe(kv.Item2, storeResult.Cas - 1, PersistTo.One, ReplicateTo.Two);
+			var observeResult2 = _Client.Observe(kv.Item1, storeResult.Cas - 1, PersistTo.One, ReplicateTo.Two);
 			Assert.That(observeResult2.Success, Is.False);
 			Assert.That(observeResult2.Message, Is.StringMatching(ObserveOperationConstants.MESSAGE_MODIFIED));
 		}
@@ -318,17 +342,97 @@ namespace Couchbase.Tests
 		[Test]
 		public void When_Observing_A_Removed_Key_Operation_Is_Successful_With_Multi_Node_Persistence()
 		{
+			var availableNodesCount = getWorkingNodes().Count();
+			if (availableNodesCount > 1)
+			{
+				var key = GetUniqueKey("observe");
+				var value = GetRandomString();
+
+				var storeResult = _Client.ExecuteStore(StoreMode.Set, key, PersistTo.One, ReplicateTo.Two);
+				StoreAssertPass(storeResult);
+
+				var removeResult = _Client.ExecuteRemove(key, PersistTo.Two);
+				Assert.That(removeResult.Success, Is.True);
+
+				var getResult = _Client.ExecuteGet(key);
+				GetAssertFail(getResult);
+			}
+			else
+				Assert.Ignore("This test requires more than one node in the cluster");
+		}
+
+		[Test]
+		public void When_Observing_A_New_Key_With_Persist_To_Zero_And_Replicate_To_Zero_Operation_Is_Successful()
+		{
 			var key = GetUniqueKey("observe");
 			var value = GetRandomString();
 
-			var storeResult = _Client.ExecuteStore(StoreMode.Set, key, PersistTo.One, ReplicateTo.Two);
+			var storeResult = _Client.ExecuteStore(StoreMode.Set, key, value);
 			StoreAssertPass(storeResult);
 
-			var removeResult = _Client.ExecuteRemove(key, PersistTo.Two);
-			Assert.That(removeResult.Success, Is.True);
+			var observeResult = _Client.Observe(key, storeResult.Cas, PersistTo.Zero, ReplicateTo.Zero);
+			Assert.That(observeResult.Success, Is.True);
+			Assert.That(observeResult.KeyState, Is.EqualTo(ObserveKeyState.FoundNotPersisted).Or.EqualTo(ObserveKeyState.FoundPersisted));
+		}
 
-			var getResult = _Client.ExecuteGet(key);
-			GetAssertFail(getResult);
+		[Test]
+		public void When_Observing_A_Missing_Key_With_Persist_To_Zero_And_Replicate_To_Zero_Operation_Is_Not_Successful()
+		{
+			var key = GetUniqueKey("observe");
+			var value = GetRandomString();
+
+			var observeResult = _Client.Observe(key, 0, PersistTo.Zero, ReplicateTo.Zero);
+			Assert.That(observeResult.Success, Is.False);
+			Assert.That(observeResult.KeyState, Is.EqualTo(ObserveKeyState.NotFound));
+
+		}
+
+		[Test]
+		public void When_Checking_Key_Exists_With_No_Cas_Result_Is_True_For_Existing_Key()
+		{
+			var key = GetUniqueKey("observe");
+			var value = GetRandomString();
+
+			var storeResult = _Client.ExecuteStore(StoreMode.Set, key, value);
+			StoreAssertPass(storeResult);
+
+			var result = _Client.KeyExists(key);
+			Assert.That(result, Is.True);
+		}
+
+		[Test]
+		public void When_Checking_Key_Exists_With_Cas_Result_Is_True_For_Existing_Key_And_Valid_Cas()
+		{
+			var key = GetUniqueKey("observe");
+			var value = GetRandomString();
+
+			var storeResult = _Client.ExecuteStore(StoreMode.Set, key, value);
+			StoreAssertPass(storeResult);
+
+			var result = _Client.KeyExists(key, storeResult.Cas);
+			Assert.That(result, Is.True);
+		}
+
+		[Test]
+		public void When_Checking_Key_Exists_With_No_Cas_Result_Is_False_For_Missing_Key()
+		{
+			var key = GetUniqueKey("observe");
+
+			var result = _Client.KeyExists(key);
+			Assert.That(result, Is.False);
+		}
+
+		[Test]
+		public void When_Checking_Key_Exists_With_Invalid_Cas_Result_Is_False_For_Existing_Key_And_Invalid_Cas()
+		{
+			var key = GetUniqueKey("observe");
+			var value = GetRandomString();
+
+			var storeResult = _Client.ExecuteStore(StoreMode.Set, key, value);
+			StoreAssertPass(storeResult);
+
+			var result = _Client.KeyExists(key, storeResult.Cas-1);
+			Assert.That(result, Is.False);
 		}
 
 		private IEnumerable<IMemcachedNode> getWorkingNodes()

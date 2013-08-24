@@ -14,7 +14,6 @@ using Enyim.Caching.Memcached.Results;
 using Couchbase.Operations;
 using Couchbase.Results;
 using Enyim.Caching.Memcached.Protocol.Binary;
-using System.Threading.Tasks;
 using Couchbase.Settings;
 using Couchbase.Constants;
 
@@ -395,6 +394,93 @@ namespace Couchbase
 			return this.PerformTryGetAndTouch(key, MemcachedClient.GetExpiration(newExpiration), out cas, out value);
 		}
 
+		public IGetOperationResult TryGetWithLock(string key, TimeSpan lockExpiration, out CasResult<object> value)
+		{
+			object tmp;
+			ulong cas;
+
+			var retval = this.PerformTryGetWithLock(key, lockExpiration, out cas, out tmp);
+			value = new CasResult<object> { Cas = cas, Result = tmp };
+
+			return retval;
+		}
+
+		public IGetOperationResult ExecuteGetWithLock(string key)
+		{
+			return this.ExecuteGetWithLock(key, TimeSpan.Zero);
+		}
+
+		public IGetOperationResult<T> ExecuteGetWithLock<T>(string key)
+		{
+			return ExecuteGetWithLock<T>(key, TimeSpan.Zero);
+		}
+
+		public IGetOperationResult ExecuteGetWithLock(string key, TimeSpan lockExpiration)
+		{
+			CasResult<object> tmp;
+			return this.TryGetWithLock(key, lockExpiration, out tmp);
+		}
+
+		public IGetOperationResult<T> ExecuteGetWithLock<T>(string key, TimeSpan lockExpiration)
+		{
+			CasResult<object> tmp;
+			var retVal = new DefaultGetOperationResultFactory<T>().Create();
+
+			var result = TryGetWithLock(key, lockExpiration, out tmp);
+			if (result.Success)
+			{
+				if (result.Value is T)
+				{
+					result.Copy(retVal);
+					retVal.Value = (T)tmp.Result;
+					retVal.Cas = result.Cas;
+				}
+				else
+				{
+					retVal.Value = default(T);
+					retVal.Fail("Type mismatch", new InvalidCastException());
+				}
+				return retVal;
+			}
+			retVal.InnerResult = result;
+			retVal.Fail(result.Message);
+			return retVal;
+		}
+
+		public bool Unlock(string key, ulong cas)
+		{
+			return ExecuteUnlock(key, cas).Success;
+		}
+
+		public IUnlockOperationResult ExecuteUnlock(string key, ulong cas)
+		{
+			return PerformUnlock(key, cas);
+		}
+
+		public CasResult<object> GetWithLock(string key)
+		{
+			return this.GetWithLock<object>(key);
+		}
+
+		public CasResult<T> GetWithLock<T>(string key)
+		{
+			return GetWithLock<T>(key, TimeSpan.Zero);
+		}
+
+		public CasResult<object> GetWithLock(string key, TimeSpan lockExpiration)
+		{
+			return this.GetWithLock<object>(key, lockExpiration);
+		}
+
+		public CasResult<T> GetWithLock<T>(string key, TimeSpan lockExpiration)
+		{
+			CasResult<object> tmp;
+
+			return this.TryGetWithLock(key, lockExpiration, out tmp).Success
+					? new CasResult<T> { Cas = tmp.Cas, Result = (T)tmp.Result }
+					: new CasResult<T> { Cas = tmp.Cas, Result = default(T) };
+		}
+
 		public CasResult<object> GetWithCas(string key, DateTime newExpiration)
 		{
 			return this.GetWithCas<object>(key, newExpiration);
@@ -456,6 +542,73 @@ namespace Couchbase
             result.StatusCode = StatusCode.NodeNotFound;
 			result.Fail(ClientErrors.FAILURE_NODE_NOT_FOUND);
 			return result;
+		}
+
+		protected IGetOperationResult PerformTryGetWithLock(string key, TimeSpan lockExpiration, out ulong cas, out object value)
+		{
+			var hashedKey = this.KeyTransformer.Transform(key);
+			var node = this.Pool.Locate(hashedKey);
+			var result = GetOperationResultFactory.Create();
+			var exp = (uint)lockExpiration.Seconds;
+
+			if (exp > 30) throw new ArgumentOutOfRangeException("Timeout cannot be greater than 30 seconds");
+
+			if (node != null)
+			{
+				var command = this.poolInstance.OperationFactory.GetWithLock(hashedKey, exp);
+				var commandResult = this.ExecuteWithRedirect(node, command);
+
+				if (commandResult.Success)
+				{
+					result.Value = value = this.Transcoder.Deserialize(command.Result);
+					result.Cas = cas = command.CasValue;
+					if (this.PerformanceMonitor != null) this.PerformanceMonitor.Get(1, true);
+
+					result.Pass();
+					return result;
+				}
+				else
+				{
+					commandResult.Combine(result);
+					value = null;
+					cas = 0;
+					return result;
+				}
+			}
+
+			value = null;
+			cas = 0;
+			if (this.PerformanceMonitor != null) this.PerformanceMonitor.Get(1, false);
+
+			result.Fail(ClientErrors.FAILURE_NODE_NOT_FOUND);
+			return result;
+		}
+
+		protected IUnlockOperationResult PerformUnlock(string key, ulong cas)
+		{
+			var hashedKey = this.KeyTransformer.Transform(key);
+			var node = this.Pool.Locate(hashedKey);
+			var result = new UnlockOperationResult();
+
+			if (node != null)
+			{
+				var command = this.poolInstance.OperationFactory.Unlock(hashedKey, cas);
+				var commandResult = this.ExecuteWithRedirect(node, command);
+
+				if (commandResult.Success)
+				{
+					result.Pass();
+					return result;
+				}
+				else
+				{
+					commandResult.Combine(result);
+					return result;
+				}
+			}
+			result.Fail(ClientErrors.FAILURE_NODE_NOT_FOUND);
+			return result;
+
 		}
 
 		public IStoreOperationResult ExecuteStore(StoreMode mode, string key, object value, PersistTo persistTo, ReplicateTo replciateTo)
@@ -589,6 +742,17 @@ namespace Couchbase
 			return ExecuteRemove(key, PersistTo.Zero, replicateTo);
 		}
 
+		public bool KeyExists(string key)
+		{
+			return KeyExists(key, 0);
+		}
+
+		public bool KeyExists(string key, ulong cas)
+		{
+			var result = Observe(key, cas, PersistTo.Zero, ReplicateTo.Zero);
+			return result.Success;
+		}
+
 		public IObserveOperationResult Observe(string key, ulong cas, PersistTo persistTo, ReplicateTo replicateTo,
 											   ObserveKeyState persistedKeyState = ObserveKeyState.FoundPersisted,
 											   ObserveKeyState replicatedState = ObserveKeyState.FoundNotPersisted)
@@ -610,6 +774,10 @@ namespace Couchbase
 			if (replicateTo == ReplicateTo.Zero && persistTo == PersistTo.One)
 			{
 				return runner.HandleMasterPersistence(poolInstance, persistedKeyState);
+			}
+			else if (replicateTo == ReplicateTo.Zero && persistTo == PersistTo.Zero) //used for key exists checks
+			{
+				return runner.HandleMasterOnlyInCache(poolInstance);
 			}
 			else
 			{
@@ -820,6 +988,16 @@ namespace Couchbase
 			return input;
 		}
 
+		#endregion
+
+		#region MemcachedClient overrides
+		public new void FlushAll()
+		{
+			var couchbaseNodes = poolInstance.GetWorkingNodes().Where(n => n is CouchbaseNode);
+			if (couchbaseNodes.Count() > 0)
+				throw new NotImplementedException("To flush a Couchbase bucket, use the Couchbase.Management API.");
+			base.FlushAll();
+		}
 		#endregion
 	}
 }
