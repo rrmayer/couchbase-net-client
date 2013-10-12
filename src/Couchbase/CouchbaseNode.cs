@@ -61,7 +61,7 @@ namespace Couchbase
 				}
 				finally
 				{
-					((IDisposable)result.Value).Dispose();
+					result.Value.Release();
 				}
 			}
 			else
