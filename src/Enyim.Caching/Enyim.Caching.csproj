@@ -198,7 +198,7 @@
     <Compile Include="Memcached\Results\OperationResultBase.cs" />
     <Compile Include="Memcached\Results\PooledSocketResult.cs" />
     <Compile Include="Memcached\Results\RemoveOperationResult.cs" />
-    <Compile Include="Memcached\Results\StatusCodes\StatusCodeEnums.cs" />
+    <Compile Include="Memcached\Results\StatusCodes\StatusCodeEnum.cs" />
     <Compile Include="Memcached\Results\StatusCodes\StatusCodeMessages.cs" />
     <Compile Include="Memcached\Results\StoreOperationResult.cs" />
     <Compile Include="Memcached\Results\TextOperationResult.cs" />
@@ -212,7 +212,6 @@
     <Compile Include="Memcached\Transcoders\DefaultTranscoder.cs" />
     <Compile Include="Memcached\Transcoders\ITranscoder.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="StatusCode.cs" />
     <Compile Include="TigerHash.cs" />
     <Compile Include="UIntEqualityComparer.cs" />
   </ItemGroup>
